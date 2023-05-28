@@ -1,0 +1,12 @@
+*
+
+!go.mod
+!go.sum
+!*.go
+
+!cmd/**/*.go
+!pkg/**/*.go
+!apis/**/*.go
+!controllers/**/*.go
+!internal/**/*.go
+!versions.txt
