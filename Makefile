@@ -27,6 +27,9 @@ TARGETALLOCATOR_IMG ?= ${IMG_PREFIX}/${TARGETALLOCATOR_IMG_REPO}:$(addprefix v,$
 OPERATOROPAMPBRIDGE_IMG_REPO ?= operator-opamp-bridge
 OPERATOROPAMPBRIDGE_IMG ?= ${IMG_PREFIX}/${OPERATOROPAMPBRIDGE_IMG_REPO}:$(addprefix v,${VERSION})
 
+# Manager kustomization directory
+MANAGER_KUSTOMIZATION_DIR = config/manager
+
 # Options for 'bundle-build'
 ifneq ($(origin CHANNELS), undefined)
 BUNDLE_CHANNELS := --channels=$(CHANNELS)
@@ -125,7 +128,7 @@ uninstall: manifests kustomize
 # Set the controller image parameters
 .PHONY: set-image-controller
 set-image-controller: manifests kustomize
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	cd $(KUSTOMIZATION_DIR) && $(KUSTOMIZE) edit set image controller=${IMG}
 
 # Deploy controller in the current Kubernetes context, configured in ~/.kube/config
 .PHONY: deploy
@@ -140,9 +143,15 @@ undeploy: set-image-controller
 
 # Generates the released manifests
 .PHONY: release-artifacts
-release-artifacts: set-image-controller
+release-artifacts: KUSTOMIZATION_DIR=./dist
+release-artifacts: release-kustomization set-image-controller
+	$(KUSTOMIZE) build ./dist -o dist/opentelemetry-operator.yaml
+
+.PHONY: release-kustomization
+release-kustomization:
 	mkdir -p dist
-	$(KUSTOMIZE) build config/default -o dist/opentelemetry-operator.yaml
+	rm -f dist/kustomization.yaml
+	cd dist/ && kustomize create --resources ../config/default 
 
 # Generate manifests e.g. CRD, RBAC etc.
 .PHONY: manifests
@@ -194,6 +203,16 @@ e2e-log-operator:
 .PHONY: prepare-e2e
 prepare-e2e: kuttl set-image-controller container container-target-allocator container-operator-opamp-bridge start-kind cert-manager install-metrics-server install-openshift-routes load-image-all deploy
 	TARGETALLOCATOR_IMG=$(TARGETALLOCATOR_IMG) SED_BIN="$(SED)" ./hack/modify-test-images.sh
+
+# Run the e2e tests in an ephemeral kind cluster
+.PHONY: e2e-standalone
+e2e-standalone: VERSION_DATE = ""
+e2e-standalone: kuttl container container-target-allocator container-operator-opamp-bridge
+	docker tag $(IMG) local/opentelemetry-operator:e2e
+	docker tag $(TARGETALLOCATOR_IMG) local/opentelemetry-operator-targetallocator:e2e
+	docker tag $(OPERATOROPAMPBRIDGE_IMG) local/opentelemetry-operator-opampbridge:e2e
+	make release-artifacts IMG=local/opentelemetry-operator:e2e
+	$(KUTTL) test --kind-config $(KIND_CONFIG)
 
 .PHONY: scorecard-tests
 scorecard-tests: operator-sdk

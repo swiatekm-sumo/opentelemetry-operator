@@ -5,3 +5,15 @@ testDirs:
   - ./tests/e2e/
 timeout: 150
 parallel: 4
+startKIND: true
+kindNodeCache: true
+kindContainers:
+  - local/opentelemetry-operator:e2e
+  - local/opentelemetry-operator-targetallocator:e2e
+  - local/opentelemetry-operator-opampbridge:e2e
+commands: 
+  - command: make cert-manager
+  - command: make install-metrics-server
+  - command: make install-openshift-routes
+  - command: kubectl apply -f dist/opentelemetry-operator.yaml
+  - command: go run hack/check-operator-ready.go --timeout=300 --kubeconfig-path=""

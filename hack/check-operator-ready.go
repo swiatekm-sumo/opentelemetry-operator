@@ -28,6 +28,7 @@ import (
 
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,6 +47,8 @@ func init() {
 func main() {
 	var timeout int
 	var kubeconfigPath string
+	var config *rest.Config
+	var err error
 
 	defaultKubeconfigPath := filepath.Join(homedir.HomeDir(), ".kube", "config")
 
@@ -56,10 +59,21 @@ func main() {
 	pollInterval := 500 * time.Millisecond
 	timeoutPoll := time.Duration(timeout) * time.Second
 
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
-	if err != nil {
-		fmt.Printf("Error reading the kubeconfig: %s\n", err.Error())
-		os.Exit(1)
+	if kubeconfigPath != "" {
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+		if err != nil {
+			fmt.Printf("Error reading the kubeconfig: %s\n", err.Error())
+			os.Exit(1)
+		}
+	} else {
+		loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+		configOverrides := &clientcmd.ConfigOverrides{}
+		kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
+		config, err = kubeConfig.ClientConfig()
+		if err != nil {
+			fmt.Printf("Error reading the kubeconfig: %s\n", err.Error())
+			os.Exit(1)
+		}
 	}
 
 	clusterClient, err := client.New(config, client.Options{Scheme: scheme})
