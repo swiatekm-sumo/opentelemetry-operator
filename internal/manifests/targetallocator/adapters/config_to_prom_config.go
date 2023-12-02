@@ -48,8 +48,8 @@ func errorNotAStringAtIndex(component string, index int) error {
 	return fmt.Errorf("index %d: %s property in the configuration doesn't contain a valid string: %s", index, component, component)
 }
 
-// getScrapeConfigsFromPromConfig extracts the scrapeConfig array from prometheus receiver config.
-func getScrapeConfigsFromPromConfig(promReceiverConfig map[interface{}]interface{}) ([]interface{}, error) {
+// GetScrapeConfigsFromPromConfig extracts the scrapeConfig array from prometheus receiver config.
+func GetScrapeConfigsFromPromConfig(promReceiverConfig map[interface{}]interface{}) ([]map[interface{}]interface{}, error) {
 	prometheusConfigProperty, ok := promReceiverConfig["config"]
 	if !ok {
 		return nil, errorNoComponent("prometheusConfig")
@@ -70,7 +70,16 @@ func getScrapeConfigsFromPromConfig(promReceiverConfig map[interface{}]interface
 		return nil, errorNotAList("scrape_configs")
 	}
 
-	return scrapeConfigs, nil
+	scrapeConfigMaps := make([]map[interface{}]interface{}, len(scrapeConfigs))
+	for i, scrapeConfig := range scrapeConfigs {
+		scrapeConfigMap, ok := scrapeConfig.(map[interface{}]interface{})
+		if !ok {
+			return nil, errorNotAMap("scrape_config")
+		}
+		scrapeConfigMaps[i] = scrapeConfigMap
+	}
+
+	return scrapeConfigMaps, nil
 }
 
 // ConfigToPromConfig converts the incoming configuration object into the Prometheus receiver config.
@@ -111,16 +120,12 @@ func UnescapeDollarSignsInPromConfig(cfg string) (map[interface{}]interface{}, e
 		return nil, err
 	}
 
-	scrapeConfigs, err := getScrapeConfigsFromPromConfig(prometheus)
+	scrapeConfigs, err := GetScrapeConfigsFromPromConfig(prometheus)
 	if err != nil {
 		return nil, err
 	}
 
-	for i, config := range scrapeConfigs {
-		scrapeConfig, ok := config.(map[interface{}]interface{})
-		if !ok {
-			return nil, errorNotAMapAtIndex("scrape_config", i)
-		}
+	for i, scrapeConfig := range scrapeConfigs {
 
 		relabelConfigsProperty, ok := scrapeConfig["relabel_configs"]
 		if !ok {
@@ -318,7 +323,7 @@ func ValidateTargetAllocatorConfig(targetAllocatorPrometheusCR bool, promReceive
 		return nil
 	}
 	// if PrometheusCR isn't enabled, we need at least one scrape config
-	scrapeConfigs, err := getScrapeConfigsFromPromConfig(promReceiverConfig)
+	scrapeConfigs, err := GetScrapeConfigsFromPromConfig(promReceiverConfig)
 	if err != nil {
 		return err
 	}

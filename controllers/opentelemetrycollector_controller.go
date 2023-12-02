@@ -34,6 +34,7 @@ import (
 	"github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	"github.com/open-telemetry/opentelemetry-operator/internal/config"
 	"github.com/open-telemetry/opentelemetry-operator/internal/manifests"
+	"github.com/open-telemetry/opentelemetry-operator/internal/manifests/collector"
 	collectorStatus "github.com/open-telemetry/opentelemetry-operator/internal/status/collector"
 	"github.com/open-telemetry/opentelemetry-operator/pkg/featuregate"
 )
@@ -56,8 +57,8 @@ type Params struct {
 	Config   config.Config
 }
 
-func (r *OpenTelemetryCollectorReconciler) getParams(instance v1alpha1.OpenTelemetryCollector) manifests.Params {
-	return manifests.Params{
+func (r *OpenTelemetryCollectorReconciler) getParams(instance v1alpha1.OpenTelemetryCollector) (manifests.Params, error) {
+	params := manifests.Params{
 		Config:   r.config,
 		Client:   r.Client,
 		OtelCol:  instance,
@@ -65,6 +66,16 @@ func (r *OpenTelemetryCollectorReconciler) getParams(instance v1alpha1.OpenTelem
 		Scheme:   r.scheme,
 		Recorder: r.recorder,
 	}
+
+	// generate the target allocator CR from the collector CR
+	targetAllocator, err := collector.TargetAllocator(params)
+	if err != nil {
+		return params, err
+	}
+	if targetAllocator != nil {
+		params.TargetAllocator = *targetAllocator
+	}
+	return params, nil
 }
 
 // NewReconciler creates a new reconciler for OpenTelemetryCollector objects.
@@ -119,7 +130,10 @@ func (r *OpenTelemetryCollectorReconciler) Reconcile(ctx context.Context, req ct
 		return ctrl.Result{}, nil
 	}
 
-	params := r.getParams(instance)
+	params, buildErr := r.getParams(instance)
+	if buildErr != nil {
+		return ctrl.Result{}, buildErr
+	}
 
 	desiredObjects, buildErr := BuildCollector(params)
 	if buildErr != nil {
