@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
+	"github.com/open-telemetry/opentelemetry-operator/apis/v1alpha2"
 	"github.com/open-telemetry/opentelemetry-operator/internal/config"
 	"github.com/open-telemetry/opentelemetry-operator/internal/manifests"
 )
@@ -66,25 +67,25 @@ var tests = []test{
 func TestPDBWithValidStrategy(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			otelcol := v1alpha1.OpenTelemetryCollector{
+			targetAllocator := v1alpha2.TargetAllocator{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-instance",
 				},
-				Spec: v1alpha1.OpenTelemetryCollectorSpec{
-					TargetAllocator: v1alpha1.OpenTelemetryTargetAllocator{
-						PodDisruptionBudget: &v1alpha1.PodDisruptionBudgetSpec{
+				Spec: v1alpha2.TargetAllocatorSpec{
+					OpenTelemetryCommonFields: v1alpha2.OpenTelemetryCommonFields{
+						PodDisruptionBudget: &v1alpha2.PodDisruptionBudgetSpec{
 							MinAvailable:   test.MinAvailable,
 							MaxUnavailable: test.MaxUnavailable,
 						},
-						AllocationStrategy: v1alpha1.OpenTelemetryTargetAllocatorAllocationStrategyConsistentHashing,
 					},
+					AllocationStrategy: v1alpha2.TargetAllocatorAllocationStrategyConsistentHashing,
 				},
 			}
 			configuration := config.New()
 			pdb, err := PodDisruptionBudget(manifests.Params{
-				Log:     logger,
-				Config:  configuration,
-				OtelCol: otelcol,
+				Log:             logger,
+				Config:          configuration,
+				TargetAllocator: targetAllocator,
 			})
 
 			// verify
@@ -100,25 +101,25 @@ func TestPDBWithValidStrategy(t *testing.T) {
 func TestPDBWithNotValidStrategy(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			otelcol := v1alpha1.OpenTelemetryCollector{
+			targetAllocator := v1alpha2.TargetAllocator{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-instance",
 				},
-				Spec: v1alpha1.OpenTelemetryCollectorSpec{
-					TargetAllocator: v1alpha1.OpenTelemetryTargetAllocator{
-						PodDisruptionBudget: &v1alpha1.PodDisruptionBudgetSpec{
+				Spec: v1alpha2.TargetAllocatorSpec{
+					OpenTelemetryCommonFields: v1alpha2.OpenTelemetryCommonFields{
+						PodDisruptionBudget: &v1alpha2.PodDisruptionBudgetSpec{
 							MinAvailable:   test.MinAvailable,
 							MaxUnavailable: test.MaxUnavailable,
 						},
-						AllocationStrategy: v1alpha1.OpenTelemetryTargetAllocatorAllocationStrategyLeastWeighted,
 					},
+					AllocationStrategy: v1alpha2.TargetAllocatorAllocationStrategyLeastWeighted,
 				},
 			}
 			configuration := config.New()
 			pdb, err := PodDisruptionBudget(manifests.Params{
-				Log:     logger,
-				Config:  configuration,
-				OtelCol: otelcol,
+				Log:             logger,
+				Config:          configuration,
+				TargetAllocator: targetAllocator,
 			})
 
 			// verify

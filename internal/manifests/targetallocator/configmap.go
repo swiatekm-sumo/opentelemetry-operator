@@ -21,9 +21,6 @@ import (
 
 	"github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	"github.com/open-telemetry/opentelemetry-operator/internal/manifests"
-	"github.com/open-telemetry/opentelemetry-operator/internal/manifests/collector"
-	"github.com/open-telemetry/opentelemetry-operator/internal/manifests/manifestutils"
-	"github.com/open-telemetry/opentelemetry-operator/internal/manifests/targetallocator/adapters"
 	"github.com/open-telemetry/opentelemetry-operator/internal/naming"
 )
 
@@ -32,48 +29,46 @@ const (
 )
 
 func ConfigMap(params manifests.Params) (*corev1.ConfigMap, error) {
-	name := naming.TAConfigMap(params.OtelCol.Name)
-	labels := Labels(params.OtelCol, name)
-
-	// Collector supports environment variable substitution, but the TA does not.
-	// TA ConfigMap should have a single "$", as it does not support env var substitution
-	prometheusReceiverConfig, err := adapters.UnescapeDollarSignsInPromConfig(params.OtelCol.Spec.Config)
-	if err != nil {
-		return &corev1.ConfigMap{}, err
-	}
+	instance := params.TargetAllocator
+	name := naming.TAConfigMap(instance.Name)
+	labels := Labels(instance, name)
+	taSpec := instance.Spec
 
 	taConfig := make(map[interface{}]interface{})
 	prometheusCRConfig := make(map[interface{}]interface{})
-	collectorSelectorLabels := manifestutils.SelectorLabels(params.OtelCol.ObjectMeta, collector.ComponentOpenTelemetryCollector)
-	taConfig["collector_selector"] = map[string]any{
-		"matchlabels": collectorSelectorLabels,
-	}
+	taConfig["collector_selector"] = taSpec.CollectorSelector
 	// The below instruction is here for compatibility with the previous target allocator version
 	// TODO: Drop it after 3 more versions
-	taConfig["label_selector"] = collectorSelectorLabels
-	// We only take the "config" from the returned object, if it's present
-	if prometheusConfig, ok := prometheusReceiverConfig["config"]; ok {
-		taConfig["config"] = prometheusConfig
+	taConfig["label_selector"] = taSpec.CollectorSelector.MatchLabels
+
+	// Add scrape configs if present
+	if instance.Spec.ScrapeConfigs != nil {
+		taConfig["config"] = map[string]interface{}{
+			"scrape_configs": instance.Spec.ScrapeConfigs,
+		}
 	}
 
-	if len(params.OtelCol.Spec.TargetAllocator.AllocationStrategy) > 0 {
-		taConfig["allocation_strategy"] = params.OtelCol.Spec.TargetAllocator.AllocationStrategy
+	if len(taSpec.AllocationStrategy) > 0 {
+		taConfig["allocation_strategy"] = taSpec.AllocationStrategy
 	} else {
 		taConfig["allocation_strategy"] = v1alpha1.OpenTelemetryTargetAllocatorAllocationStrategyConsistentHashing
 	}
 
-	taConfig["filter_strategy"] = params.OtelCol.Spec.TargetAllocator.FilterStrategy
+	if len(taSpec.FilterStrategy) > 0 {
+		taConfig["filter_strategy"] = taSpec.FilterStrategy
+	}
+	taConfig["filter_strategy"] = taSpec.FilterStrategy
 
-	if params.OtelCol.Spec.TargetAllocator.PrometheusCR.ScrapeInterval.Size() > 0 {
-		prometheusCRConfig["scrape_interval"] = params.OtelCol.Spec.TargetAllocator.PrometheusCR.ScrapeInterval.Duration
+	if taSpec.PrometheusCR.ScrapeInterval.Size() > 0 {
+		prometheusCRConfig["scrape_interval"] = taSpec.PrometheusCR.ScrapeInterval.Duration
 	}
 
-	if params.OtelCol.Spec.TargetAllocator.PrometheusCR.ServiceMonitorSelector != nil {
-		taConfig["service_monitor_selector"] = &params.OtelCol.Spec.TargetAllocator.PrometheusCR.ServiceMonitorSelector
+	if taSpec.PrometheusCR.ServiceMonitorSelector != nil {
+		taConfig["service_monitor_selector"] = &taSpec.PrometheusCR.ServiceMonitorSelector.MatchLabels
 	}
 
-	if params.OtelCol.Spec.TargetAllocator.PrometheusCR.PodMonitorSelector != nil {
-		taConfig["pod_monitor_selector"] = &params.OtelCol.Spec.TargetAllocator.PrometheusCR.PodMonitorSelector
+	if taSpec.PrometheusCR.PodMonitorSelector != nil {
+		taConfig["pod_monitor_selector"] = &taSpec.PrometheusCR.PodMonitorSelector.MatchLabels
 	}
 
 	if len(prometheusCRConfig) > 0 {
@@ -88,9 +83,9 @@ func ConfigMap(params manifests.Params) (*corev1.ConfigMap, error) {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
-			Namespace:   params.OtelCol.Namespace,
+			Namespace:   instance.Namespace,
 			Labels:      labels,
-			Annotations: params.OtelCol.Annotations,
+			Annotations: instance.Annotations,
 		},
 		Data: map[string]string{
 			targetAllocatorFilename: string(taConfigYAML),
