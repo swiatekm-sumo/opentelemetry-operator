@@ -21,7 +21,6 @@ import (
 
 	"github.com/go-logr/logr"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
-	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -36,34 +35,6 @@ import (
 var (
 	_ admission.CustomValidator = &CollectorWebhook{}
 	_ admission.CustomDefaulter = &CollectorWebhook{}
-	// targetAllocatorCRPolicyRules are the policy rules required for the CR functionality.
-
-	targetAllocatorCRPolicyRules = []*rbacv1.PolicyRule{
-		{
-			APIGroups: []string{"monitoring.coreos.com"},
-			Resources: []string{"servicemonitors", "podmonitors"},
-			Verbs:     []string{"*"},
-		}, {
-			APIGroups: []string{""},
-			Resources: []string{"nodes", "nodes/metrics", "services", "endpoints", "pods", "namespaces"},
-			Verbs:     []string{"get", "list", "watch"},
-		}, {
-			APIGroups: []string{""},
-			Resources: []string{"configmaps"},
-			Verbs:     []string{"get"},
-		}, {
-			APIGroups: []string{"discovery.k8s.io"},
-			Resources: []string{"endpointslices"},
-			Verbs:     []string{"get", "list", "watch"},
-		}, {
-			APIGroups: []string{"networking.k8s.io"},
-			Resources: []string{"ingresses"},
-			Verbs:     []string{"get", "list", "watch"},
-		}, {
-			NonResourceURLs: []string{"/metrics"},
-			Verbs:           []string{"get"},
-		},
-	}
 )
 
 // +kubebuilder:webhook:path=/mutate-opentelemetry-io-v1beta1-opentelemetrycollector,mutating=true,failurePolicy=fail,groups=opentelemetry.io,resources=opentelemetrycollectors,verbs=create;update,versions=v1beta1,name=mopentelemetrycollectorbeta.kb.io,sideEffects=none,admissionReviewVersions=v1
@@ -325,11 +296,11 @@ func (c CollectorWebhook) validate(ctx context.Context, r *OpenTelemetryCollecto
 	}
 
 	// validate probes Liveness/Readiness
-	err := validateProbe("LivenessProbe", r.Spec.LivenessProbe)
+	err := ValidateProbe("LivenessProbe", r.Spec.LivenessProbe)
 	if err != nil {
 		return warnings, err
 	}
-	err = validateProbe("ReadinessProbe", r.Spec.ReadinessProbe)
+	err = ValidateProbe("ReadinessProbe", r.Spec.ReadinessProbe)
 	if err != nil {
 		return warnings, err
 	}
@@ -379,17 +350,17 @@ func (c CollectorWebhook) validateTargetAllocatorConfig(ctx context.Context, r *
 	}
 	// if the prometheusCR is enabled, it needs a suite of permissions to function
 	if r.Spec.TargetAllocator.PrometheusCR.Enabled {
-		if subjectAccessReviews, err := c.reviewer.CheckPolicyRules(ctx, r.Spec.TargetAllocator.ServiceAccount, r.GetNamespace(), targetAllocatorCRPolicyRules...); err != nil {
-			return nil, fmt.Errorf("unable to check rbac rules %w", err)
-		} else if allowed, deniedReviews := rbac.AllSubjectAccessReviewsAllowed(subjectAccessReviews); !allowed {
-			return rbac.WarningsGroupedByResource(deniedReviews), nil
+		warnings, err := CheckTargetAllocatorPrometheusCRPolicyRules(
+			ctx, c.reviewer, r.Spec.TargetAllocator.ServiceAccount, r.GetNamespace())
+		if err != nil || len(warnings) > 0 {
+			return warnings, err
 		}
 	}
 
 	return nil, nil
 }
 
-func validateProbe(probeName string, probe *Probe) error {
+func ValidateProbe(probeName string, probe *Probe) error {
 	if probe != nil {
 		if probe.InitialDelaySeconds != nil && *probe.InitialDelaySeconds < 0 {
 			return fmt.Errorf("the OpenTelemetry Spec %s InitialDelaySeconds configuration is incorrect. InitialDelaySeconds should be greater than or equal to 0", probeName)

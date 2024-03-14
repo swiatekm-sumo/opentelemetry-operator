@@ -710,6 +710,26 @@ spec:
     containerPort: 443
     deploymentName: opentelemetry-operator-controller-manager
     failurePolicy: Fail
+    generateName: mtargetallocatorbeta.kb.io
+    rules:
+    - apiGroups:
+      - opentelemetry.io
+      apiVersions:
+      - v1beta1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - targetallocators
+    sideEffects: None
+    targetPort: 9443
+    type: MutatingAdmissionWebhook
+    webhookPath: /mutate-opentelemetry-io-v1beta1-targetallocator
+  - admissionReviewVersions:
+    - v1
+    containerPort: 443
+    deploymentName: opentelemetry-operator-controller-manager
+    failurePolicy: Fail
     generateName: vinstrumentationcreateupdate.kb.io
     rules:
     - apiGroups:
@@ -822,3 +842,42 @@ spec:
     targetPort: 9443
     type: ValidatingAdmissionWebhook
     webhookPath: /validate-opentelemetry-io-v1beta1-opentelemetrycollector
+  - admissionReviewVersions:
+    - v1
+    containerPort: 443
+    deploymentName: opentelemetry-operator-controller-manager
+    failurePolicy: Fail
+    generateName: vtargetallocatorcreateupdatebeta.kb.io
+    rules:
+    - apiGroups:
+      - opentelemetry.io
+      apiVersions:
+      - v1beta1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - targetallocators
+    sideEffects: None
+    targetPort: 9443
+    type: ValidatingAdmissionWebhook
+    webhookPath: /validate-opentelemetry-io-v1beta1-targetallocator
+  - admissionReviewVersions:
+    - v1
+    containerPort: 443
+    deploymentName: opentelemetry-operator-controller-manager
+    failurePolicy: Ignore
+    generateName: vtargetallocatordeletebeta.kb.io
+    rules:
+    - apiGroups:
+      - opentelemetry.io
+      apiVersions:
+      - v1beta1
+      operations:
+      - DELETE
+      resources:
+      - targetallocators
+    sideEffects: None
+    targetPort: 9443
+    type: ValidatingAdmissionWebhook
+    webhookPath: /validate-opentelemetry-io-v1beta1-targetallocator
