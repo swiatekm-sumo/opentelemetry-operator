@@ -35,9 +35,9 @@ var (
 	_ admission.CustomDefaulter = &TargetAllocatorWebhook{}
 )
 
-// +kubebuilder:webhook:path=/mutate-opentelemetry-io-v1beta1-targetallocator,mutating=true,failurePolicy=fail,groups=opentelemetry.io,resources=targetallocators,verbs=create;update,versions=v1beta1,name=mtargetallocatorbeta.kb.io,sideEffects=none,admissionReviewVersions=v1
-// +kubebuilder:webhook:verbs=create;update,path=/validate-opentelemetry-io-v1beta1-targetallocator,mutating=false,failurePolicy=fail,groups=opentelemetry.io,resources=targetallocators,versions=v1beta1,name=vtargetallocatorcreateupdatebeta.kb.io,sideEffects=none,admissionReviewVersions=v1
-// +kubebuilder:webhook:verbs=delete,path=/validate-opentelemetry-io-v1beta1-targetallocator,mutating=false,failurePolicy=ignore,groups=opentelemetry.io,resources=targetallocators,versions=v1beta1,name=vtargetallocatordeletebeta.kb.io,sideEffects=none,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/mutate-opentelemetry-io-v1alpha1-targetallocator,mutating=true,failurePolicy=fail,groups=opentelemetry.io,resources=targetallocators,verbs=create;update,versions=v1alpha1,name=mtargetallocatorbeta.kb.io,sideEffects=none,admissionReviewVersions=v1
+// +kubebuilder:webhook:verbs=create;update,path=/validate-opentelemetry-io-v1alpha1-targetallocator,mutating=false,failurePolicy=fail,groups=opentelemetry.io,resources=targetallocators,versions=v1alpha1,name=vtargetallocatorcreateupdatebeta.kb.io,sideEffects=none,admissionReviewVersions=v1
+// +kubebuilder:webhook:verbs=delete,path=/validate-opentelemetry-io-v1alpha1-targetallocator,mutating=false,failurePolicy=ignore,groups=opentelemetry.io,resources=targetallocators,versions=v1alpha1,name=vtargetallocatordeletebeta.kb.io,sideEffects=none,admissionReviewVersions=v1
 // +kubebuilder:object:generate=false
 
 type TargetAllocatorWebhook struct {
@@ -139,7 +139,7 @@ func (w TargetAllocatorWebhook) validate(ctx context.Context, ta *TargetAllocato
 func SetupTargetAllocatorWebhook(mgr ctrl.Manager, cfg config.Config, reviewer *rbac.Reviewer) error {
 	cvw := &TargetAllocatorWebhook{
 		reviewer: reviewer,
-		logger:   mgr.GetLogger().WithValues("handler", "CollectorWebhook", "version", "v1beta1"),
+		logger:   mgr.GetLogger().WithValues("handler", "TargetAllocatorWebhook", "version", "v1beta1"),
 		scheme:   mgr.GetScheme(),
 		cfg:      cfg,
 	}

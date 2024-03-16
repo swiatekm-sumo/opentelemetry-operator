@@ -241,6 +241,9 @@ spec:
         displayName: Create ServiceMonitors for OpenTelemetry Collector
         path: targetAllocator.observability.metrics.enableMetrics
       version: v1beta1
+    - kind: TargetAllocator
+      name: targetallocators.opentelemetry.io
+      version: v1alpha1
   description: |-
     OpenTelemetry is a collection of tools, APIs, and SDKs. You use it to instrument, generate, collect, and export telemetry data (metrics, logs, and traces) for analysis in order to understand your software's performance and behavior.
 
@@ -295,6 +298,18 @@ spec:
           - daemonsets
           - deployments
           - statefulsets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
           verbs:
           - create
           - delete
@@ -432,6 +447,24 @@ spec:
           - opentelemetry.io
           resources:
           - opentelemetrycollectors/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - opentelemetry.io
+          resources:
+          - targetallocators
+          verbs:
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - opentelemetry.io
+          resources:
+          - targetallocators/status
           verbs:
           - get
           - patch
@@ -715,7 +748,7 @@ spec:
     - apiGroups:
       - opentelemetry.io
       apiVersions:
-      - v1beta1
+      - v1alpha1
       operations:
       - CREATE
       - UPDATE
@@ -724,7 +757,7 @@ spec:
     sideEffects: None
     targetPort: 9443
     type: MutatingAdmissionWebhook
-    webhookPath: /mutate-opentelemetry-io-v1beta1-targetallocator
+    webhookPath: /mutate-opentelemetry-io-v1alpha1-targetallocator
   - admissionReviewVersions:
     - v1
     containerPort: 443
@@ -852,7 +885,7 @@ spec:
     - apiGroups:
       - opentelemetry.io
       apiVersions:
-      - v1beta1
+      - v1alpha1
       operations:
       - CREATE
       - UPDATE
@@ -861,7 +894,7 @@ spec:
     sideEffects: None
     targetPort: 9443
     type: ValidatingAdmissionWebhook
-    webhookPath: /validate-opentelemetry-io-v1beta1-targetallocator
+    webhookPath: /validate-opentelemetry-io-v1alpha1-targetallocator
   - admissionReviewVersions:
     - v1
     containerPort: 443
@@ -872,7 +905,7 @@ spec:
     - apiGroups:
       - opentelemetry.io
       apiVersions:
-      - v1beta1
+      - v1alpha1
       operations:
       - DELETE
       resources:
@@ -880,4 +913,4 @@ spec:
     sideEffects: None
     targetPort: 9443
     type: ValidatingAdmissionWebhook
-    webhookPath: /validate-opentelemetry-io-v1beta1-targetallocator
+    webhookPath: /validate-opentelemetry-io-v1alpha1-targetallocator

@@ -70,14 +70,14 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-opentelemetry-io-v1beta1-targetallocator
+      path: /mutate-opentelemetry-io-v1alpha1-targetallocator
   failurePolicy: Fail
   name: mtargetallocatorbeta.kb.io
   rules:
   - apiGroups:
     - opentelemetry.io
     apiVersions:
-    - v1beta1
+    - v1alpha1
     operations:
     - CREATE
     - UPDATE
@@ -232,14 +232,14 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-opentelemetry-io-v1beta1-targetallocator
+      path: /validate-opentelemetry-io-v1alpha1-targetallocator
   failurePolicy: Fail
   name: vtargetallocatorcreateupdatebeta.kb.io
   rules:
   - apiGroups:
     - opentelemetry.io
     apiVersions:
-    - v1beta1
+    - v1alpha1
     operations:
     - CREATE
     - UPDATE
@@ -252,14 +252,14 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-opentelemetry-io-v1beta1-targetallocator
+      path: /validate-opentelemetry-io-v1alpha1-targetallocator
   failurePolicy: Ignore
   name: vtargetallocatordeletebeta.kb.io
   rules:
   - apiGroups:
     - opentelemetry.io
     apiVersions:
-    - v1beta1
+    - v1alpha1
     operations:
     - DELETE
     resources:

@@ -364,6 +364,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = controllers.NewTargetAllocatorReconciler(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		mgr.GetEventRecorderFor("targetallocator"),
+		cfg,
+		ctrl.Log.WithName("controllers").WithName("TargetAllocator"),
+	).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "TargetAllocator")
+		os.Exit(1)
+	}
+
 	if err = controllers.NewOpAMPBridgeReconciler(controllers.OpAMPBridgeReconcilerParams{
 		Client:   mgr.GetClient(),
 		Log:      ctrl.Log.WithName("controllers").WithName("OpAMPBridge"),
@@ -393,6 +404,10 @@ func main() {
 
 		if err = otelv1beta1.SetupCollectorWebhook(mgr, cfg, reviewer, crdMetrics); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "OpenTelemetryCollector")
+			os.Exit(1)
+		}
+		if err = otelv1alpha1.SetupTargetAllocatorWebhook(mgr, cfg, reviewer); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "TargetAllocator")
 			os.Exit(1)
 		}
 		if err = otelv1alpha1.SetupInstrumentationWebhook(mgr, cfg); err != nil {
