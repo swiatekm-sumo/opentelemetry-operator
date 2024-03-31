@@ -134,7 +134,7 @@ func TestDeploymentNewDefault(t *testing.T) {
 	cfg := config.New()
 
 	params := Params{
-		Collector:       otelcol,
+		Collector:       &otelcol,
 		TargetAllocator: targetAllocator,
 		Config:          cfg,
 		Log:             logger,
@@ -168,7 +168,7 @@ func TestDeploymentPodAnnotations(t *testing.T) {
 	cfg := config.New()
 
 	params := Params{
-		Collector:       otelcol,
+		Collector:       &otelcol,
 		TargetAllocator: targetAllocator,
 		Config:          cfg,
 		Log:             logger,
@@ -402,7 +402,7 @@ func TestDeploymentSetInitContainer(t *testing.T) {
 	}
 	otelcol := collectorInstance()
 	params := Params{
-		Collector:       otelcol,
+		Collector:       &otelcol,
 		TargetAllocator: targetAllocator,
 		Config:          config.New(),
 		Log:             logger,
@@ -424,7 +424,7 @@ func TestDeploymentAdditionalContainers(t *testing.T) {
 	}
 	otelcol := collectorInstance()
 	params := Params{
-		Collector:       otelcol,
+		Collector:       &otelcol,
 		TargetAllocator: targetAllocator,
 		Config:          config.New(),
 		Log:             logger,
@@ -442,7 +442,7 @@ func TestDeploymentHostNetwork(t *testing.T) {
 	targetAllocator := targetAllocatorInstance()
 	otelcol := collectorInstance()
 	params := Params{
-		Collector:       otelcol,
+		Collector:       &otelcol,
 		TargetAllocator: targetAllocator,
 		Config:          config.New(),
 		Log:             logger,
@@ -468,7 +468,7 @@ func TestDeploymentShareProcessNamespace(t *testing.T) {
 	targetAllocator := targetAllocatorInstance()
 	otelcol := collectorInstance()
 	params := Params{
-		Collector:       otelcol,
+		Collector:       &otelcol,
 		TargetAllocator: targetAllocator,
 		Config:          config.New(),
 		Log:             logger,
@@ -491,7 +491,7 @@ func TestDeploymentPriorityClassName(t *testing.T) {
 	targetAllocator := targetAllocatorInstance()
 	otelcol := collectorInstance()
 	params := Params{
-		Collector:       otelcol,
+		Collector:       &otelcol,
 		TargetAllocator: targetAllocator,
 		Config:          config.New(),
 		Log:             logger,
@@ -514,7 +514,7 @@ func TestDeploymentTerminationGracePeriodSeconds(t *testing.T) {
 	targetAllocator := targetAllocatorInstance()
 	otelcol := collectorInstance()
 	params := Params{
-		Collector:       otelcol,
+		Collector:       &otelcol,
 		TargetAllocator: targetAllocator,
 		Config:          config.New(),
 		Log:             logger,

@@ -22,6 +22,7 @@ import (
 	"github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	"github.com/open-telemetry/opentelemetry-operator/internal/manifests/collector"
 	"github.com/open-telemetry/opentelemetry-operator/internal/manifests/manifestutils"
+	"github.com/open-telemetry/opentelemetry-operator/internal/manifests/targetallocator/adapters"
 	"github.com/open-telemetry/opentelemetry-operator/internal/naming"
 )
 
@@ -37,14 +38,31 @@ func ConfigMap(params Params) (*corev1.ConfigMap, error) {
 
 	taConfig := make(map[interface{}]interface{})
 
-	taConfig["collector_selector"] = metav1.LabelSelector{
-		MatchLabels: manifestutils.SelectorLabels(params.Collector.ObjectMeta, collector.ComponentOpenTelemetryCollector),
+	if params.Collector != nil {
+		taConfig["collector_selector"] = metav1.LabelSelector{
+			MatchLabels: manifestutils.SelectorLabels(params.Collector.ObjectMeta, collector.ComponentOpenTelemetryCollector),
+		}
 	}
 
 	// Add scrape configs if present
+	scrapeConfigs := []v1beta1.AnyConfig{}
 	if instance.Spec.ScrapeConfigs != nil && len(instance.Spec.ScrapeConfigs) > 0 {
+		scrapeConfigs = append(scrapeConfigs, instance.Spec.ScrapeConfigs...)
+	}
+	if params.Collector != nil {
+		collectorConfigStr, err := params.Collector.Spec.Config.Yaml()
+		if err != nil {
+			return nil, err
+		}
+		collectorScrapeConfigs, err := getScrapeConfigs(collectorConfigStr)
+		if err != nil {
+			return nil, err
+		}
+		scrapeConfigs = append(scrapeConfigs, collectorScrapeConfigs...)
+	}
+	if len(scrapeConfigs) > 0 {
 		taConfig["config"] = map[string]interface{}{
-			"scrape_configs": instance.Spec.ScrapeConfigs,
+			"scrape_configs": scrapeConfigs,
 		}
 	}
 
@@ -86,4 +104,36 @@ func ConfigMap(params Params) (*corev1.ConfigMap, error) {
 			targetAllocatorFilename: string(taConfigYAML),
 		},
 	}, nil
+}
+
+func getScrapeConfigs(otelcolConfig string) ([]v1beta1.AnyConfig, error) {
+	// Collector supports environment variable substitution, but the TA does not.
+	// TA Scrape Configs should have a single "$", as it does not support env var substitution
+	prometheusReceiverConfig, err := adapters.UnescapeDollarSignsInPromConfig(otelcolConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	scrapeConfigs, err := adapters.GetScrapeConfigsFromPromConfig(prometheusReceiverConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	v1beta1scrapeConfigs := make([]v1beta1.AnyConfig, len(scrapeConfigs))
+
+	for i, config := range scrapeConfigs {
+		// marshal and unmarshal to get string keys on maps, which is required for json conversion
+		marshaled, err := yaml.Marshal(config)
+		if err != nil {
+			return nil, err
+		}
+		var newConfig map[string]any
+		err = yaml.Unmarshal(marshaled, &newConfig)
+		if err != nil {
+			return nil, err
+		}
+		v1beta1scrapeConfigs[i] = v1beta1.AnyConfig{Object: newConfig}
+	}
+
+	return v1beta1scrapeConfigs, nil
 }

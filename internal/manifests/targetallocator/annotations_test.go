@@ -40,7 +40,7 @@ func TestConfigMapHash(t *testing.T) {
 	collector := collectorInstance()
 	targetAllocator := targetAllocatorInstance()
 	params := Params{
-		Collector:       collector,
+		Collector:       &collector,
 		TargetAllocator: targetAllocator,
 		Config:          cfg,
 		Log:             logr.Discard(),

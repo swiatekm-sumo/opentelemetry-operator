@@ -15,12 +15,10 @@
 package collector
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,17 +45,6 @@ func TestTargetAllocator(t *testing.T) {
 	privileged := true
 	runAsUser := int64(1337)
 	runasGroup := int64(1338)
-	otelcolConfig := v1beta1.Config{
-		Receivers: v1beta1.AnyConfig{
-			Object: map[string]interface{}{
-				"prometheus": map[string]any{
-					"config": map[string]any{
-						"scrape_configs": []any{},
-					},
-				},
-			},
-		},
-	}
 
 	testCases := []struct {
 		name    string
@@ -81,7 +68,6 @@ func TestTargetAllocator(t *testing.T) {
 			input: v1beta1.OpenTelemetryCollector{
 				ObjectMeta: objectMetadata,
 				Spec: v1beta1.OpenTelemetryCollectorSpec{
-					Config: otelcolConfig,
 					TargetAllocator: v1beta1.TargetAllocatorEmbedded{
 						Enabled: true,
 					},
@@ -89,9 +75,6 @@ func TestTargetAllocator(t *testing.T) {
 			},
 			want: &v1alpha1.TargetAllocator{
 				ObjectMeta: objectMetadata,
-				Spec: v1alpha1.TargetAllocatorSpec{
-					ScrapeConfigs: []v1beta1.AnyConfig{},
-				},
 			},
 		},
 		{
@@ -194,7 +177,6 @@ func TestTargetAllocator(t *testing.T) {
 							},
 						},
 					},
-					Config: otelcolConfig,
 				},
 			},
 			want: &v1alpha1.TargetAllocator{
@@ -290,7 +272,6 @@ func TestTargetAllocator(t *testing.T) {
 							MatchLabels: map[string]string{"servicemonitorkey": "servicemonitorkey"},
 						},
 					},
-					ScrapeConfigs: []v1beta1.AnyConfig{},
 					Observability: v1beta1.ObservabilitySpec{
 						Metrics: v1beta1.MetricsConfigSpec{
 							EnableMetrics: true,
@@ -308,113 +289,6 @@ func TestTargetAllocator(t *testing.T) {
 				OtelCol: testCase.input,
 			}
 			actual, err := TargetAllocator(params)
-			assert.Equal(t, testCase.wantErr, err)
-			assert.Equal(t, testCase.want, actual)
-		})
-	}
-}
-
-func TestGetScrapeConfigs(t *testing.T) {
-	testCases := []struct {
-		name    string
-		input   v1beta1.Config
-		want    []v1beta1.AnyConfig
-		wantErr error
-	}{
-		{
-			name: "empty scrape configs list",
-			input: v1beta1.Config{
-				Receivers: v1beta1.AnyConfig{
-					Object: map[string]interface{}{
-						"prometheus": map[string]any{
-							"config": map[string]any{
-								"scrape_configs": []any{},
-							},
-						},
-					},
-				},
-			},
-			want: []v1beta1.AnyConfig{},
-		},
-		{
-			name: "no scrape configs key",
-			input: v1beta1.Config{
-				Receivers: v1beta1.AnyConfig{
-					Object: map[string]interface{}{
-						"prometheus": map[string]any{
-							"config": map[string]any{},
-						},
-					},
-				},
-			},
-			wantErr: fmt.Errorf("no scrape_configs available as part of the configuration"),
-		},
-		{
-			name: "one scrape config",
-			input: v1beta1.Config{
-				Receivers: v1beta1.AnyConfig{
-					Object: map[string]interface{}{
-						"prometheus": map[string]any{
-							"config": map[string]any{
-								"scrape_configs": []any{
-									map[string]any{
-										"job": "somejob",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			want: []v1beta1.AnyConfig{
-				{Object: map[string]interface{}{"job": "somejob"}},
-			},
-		},
-		{
-			name: "regex substitution",
-			input: v1beta1.Config{
-				Receivers: v1beta1.AnyConfig{
-					Object: map[string]interface{}{
-						"prometheus": map[string]any{
-							"config": map[string]any{
-								"scrape_configs": []any{
-									map[string]any{
-										"job": "somejob",
-										"metric_relabel_configs": []map[string]any{
-											{
-												"action":      "labelmap",
-												"regex":       "label_(.+)",
-												"replacement": "$$1",
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			want: []v1beta1.AnyConfig{
-				{Object: map[string]interface{}{
-					"job": "somejob",
-					"metric_relabel_configs": []any{
-						map[any]any{
-							"action":      "labelmap",
-							"regex":       "label_(.+)",
-							"replacement": "$1",
-						},
-					},
-				}},
-			},
-		},
-	}
-
-	for _, testCase := range testCases {
-		testCase := testCase
-		t.Run(testCase.name, func(t *testing.T) {
-			configStr, err := testCase.input.Yaml()
-			require.NoError(t, err)
-			actual, err := getScrapeConfigs(configStr)
 			assert.Equal(t, testCase.wantErr, err)
 			assert.Equal(t, testCase.want, actual)
 		})

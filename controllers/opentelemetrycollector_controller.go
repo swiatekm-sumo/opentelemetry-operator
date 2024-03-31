@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	"github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	"github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	"github.com/open-telemetry/opentelemetry-operator/internal/autodetect/openshift"
 	"github.com/open-telemetry/opentelemetry-operator/internal/autodetect/prometheus"
@@ -168,8 +169,8 @@ func (r *OpenTelemetryCollectorReconciler) getConfigMapsToRemove(configVersionsT
 	return ownedConfigMaps
 }
 
-func (r *OpenTelemetryCollectorReconciler) getParams(instance v1beta1.OpenTelemetryCollector) (manifests.Params, error) {
-	p := manifests.Params{
+func (r *OpenTelemetryCollectorReconciler) getParams(instance v1beta1.OpenTelemetryCollector) manifests.Params {
+	return manifests.Params{
 		Config:   r.config,
 		Client:   r.Client,
 		OtelCol:  instance,
@@ -177,16 +178,6 @@ func (r *OpenTelemetryCollectorReconciler) getParams(instance v1beta1.OpenTeleme
 		Scheme:   r.scheme,
 		Recorder: r.recorder,
 	}
-
-	// generate the target allocator CR from the collector CR
-	targetAllocator, err := collector.TargetAllocator(p)
-	if err != nil {
-		return p, err
-	}
-	if targetAllocator != nil {
-		p.TargetAllocator = *targetAllocator
-	}
-	return p, nil
 }
 
 // NewReconciler creates a new reconciler for OpenTelemetryCollector objects.
@@ -211,16 +202,19 @@ func NewReconciler(p Params) *OpenTelemetryCollectorReconciler {
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes;routes/custom-host,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures;infrastructures/status,verbs=get;list;watch
+// +kubebuilder:rbac:groups=opentelemetry.io,resources=targetallocators,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=opentelemetry.io,resources=opentelemetrycollectors,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=opentelemetry.io,resources=opentelemetrycollectors/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=opentelemetry.io,resources=opentelemetrycollectors/finalizers,verbs=get;update;patch
 
 // Reconcile the current state of an OpenTelemetry collector resource with the desired state.
 func (r *OpenTelemetryCollectorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	var err error
+
 	log := r.log.WithValues("opentelemetrycollector", req.NamespacedName)
 
 	var instance v1beta1.OpenTelemetryCollector
-	if err := r.Get(ctx, req.NamespacedName, &instance); err != nil {
+	if err = r.Get(ctx, req.NamespacedName, &instance); err != nil {
 		if !apierrors.IsNotFound(err) {
 			log.Error(err, "unable to fetch OpenTelemetryCollector")
 		}
@@ -231,11 +225,7 @@ func (r *OpenTelemetryCollectorReconciler) Reconcile(ctx context.Context, req ct
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	params, err := r.getParams(instance)
-	if err != nil {
-		log.Error(err, "Failed to create manifest.Params")
-		return ctrl.Result{}, err
-	}
+	params := r.getParams(instance)
 
 	// We have a deletion, short circuit and let the deletion happen
 	if deletionTimestamp := instance.GetDeletionTimestamp(); deletionTimestamp != nil {
@@ -293,6 +283,7 @@ func (r *OpenTelemetryCollectorReconciler) Reconcile(ctx context.Context, req ct
 func (r *OpenTelemetryCollectorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	builder := ctrl.NewControllerManagedBy(mgr).
 		For(&v1beta1.OpenTelemetryCollector{}).
+		Owns(&v1alpha1.TargetAllocator{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.ServiceAccount{}).
 		Owns(&corev1.Service{}).

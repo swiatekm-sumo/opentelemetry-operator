@@ -15,6 +15,7 @@
 package targetallocator
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -38,7 +39,7 @@ func TestDesiredConfigMap(t *testing.T) {
 	targetAllocator := targetAllocatorInstance()
 	cfg := config.New()
 	params := Params{
-		Collector:       collector,
+		Collector:       &collector,
 		TargetAllocator: targetAllocator,
 		Config:          cfg,
 		Log:             logr.Discard(),
@@ -95,7 +96,20 @@ filter_strategy: relabel-config
 		}
 		targetAllocator = targetAllocatorInstance()
 		targetAllocator.Spec.ScrapeConfigs = []v1beta1.AnyConfig{}
+		collectorWithoutScrapeConfigs := collectorInstance()
+		collectorWithoutScrapeConfigs.Spec.Config = v1beta1.Config{
+			Receivers: v1beta1.AnyConfig{
+				Object: map[string]any{
+					"prometheus": map[string]any{
+						"config": map[string]any{
+							"scrape_configs": []any{},
+						},
+					},
+				},
+			},
+		}
 		params.TargetAllocator = targetAllocator
+		params.Collector = &collectorWithoutScrapeConfigs
 		actual, err := ConfigMap(params)
 		require.NoError(t, err)
 
@@ -150,6 +164,7 @@ prometheus_cr:
 				"release": "my-instance",
 			}}
 		params.TargetAllocator = targetAllocator
+		params.Collector = &collector
 		actual, err := ConfigMap(params)
 		assert.NoError(t, err)
 
@@ -192,6 +207,7 @@ prometheus_cr:
 		targetAllocator.Spec.PrometheusCR.Enabled = true
 		targetAllocator.Spec.PrometheusCR.ScrapeInterval = &metav1.Duration{Duration: time.Second * 30}
 		params.TargetAllocator = targetAllocator
+		params.Collector = &collector
 		actual, err := ConfigMap(params)
 		assert.NoError(t, err)
 
@@ -201,4 +217,155 @@ prometheus_cr:
 
 	})
 
+}
+
+func TestGetScrapeConfigs(t *testing.T) {
+	testCases := []struct {
+		name    string
+		input   v1beta1.Config
+		want    []v1beta1.AnyConfig
+		wantErr error
+	}{
+		{
+			name: "empty scrape configs list",
+			input: v1beta1.Config{
+				Receivers: v1beta1.AnyConfig{
+					Object: map[string]interface{}{
+						"prometheus": map[any]any{
+							"config": map[any]any{
+								"scrape_configs": []any{},
+							},
+						},
+					},
+				},
+			},
+			want: []v1beta1.AnyConfig{},
+		},
+		{
+			name: "no scrape configs key",
+			input: v1beta1.Config{
+				Receivers: v1beta1.AnyConfig{
+					Object: map[string]interface{}{
+						"prometheus": map[any]any{
+							"config": map[any]any{},
+						},
+					},
+				},
+			},
+			wantErr: fmt.Errorf("no scrape_configs available as part of the configuration"),
+		},
+		{
+			name: "one scrape config",
+			input: v1beta1.Config{
+				Receivers: v1beta1.AnyConfig{
+					Object: map[string]interface{}{
+						"prometheus": map[string]any{
+							"config": map[string]any{
+								"scrape_configs": []any{
+									map[string]any{
+										"job_name": "otel-collector",
+										"relabel_configs": []any{
+											map[string]any{
+												"action": "labelmap",
+												"regex":  "__meta_kubernetes_node_label_(.+)",
+											},
+											map[string]any{
+												"action":      "labeldrop",
+												"replacement": "$1",
+											},
+											map[string]any{
+												"action":      "labelkeep",
+												"regex":       "metrica_*|metricb.*",
+												"replacement": "$1",
+											},
+										},
+										"scrape_interval": "10s",
+										"static_configs": []any{
+											map[string]any{
+												"targets": []any{"0.0.0.0:8888"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []v1beta1.AnyConfig{
+				{Object: map[string]any{
+					"job_name": "otel-collector",
+					"relabel_configs": []any{
+						map[any]any{
+							"action": "labelmap",
+							"regex":  "__meta_kubernetes_node_label_(.+)",
+						},
+						map[any]any{
+							"action":      "labeldrop",
+							"replacement": "$1",
+						},
+						map[any]any{
+							"action":      "labelkeep",
+							"regex":       "metrica_*|metricb.*",
+							"replacement": "$1",
+						},
+					},
+					"scrape_interval": "10s",
+					"static_configs": []any{
+						map[any]any{
+							"targets": []any{"0.0.0.0:8888"},
+						},
+					},
+				}},
+			},
+		},
+		{
+			name: "regex substitution",
+			input: v1beta1.Config{
+				Receivers: v1beta1.AnyConfig{
+					Object: map[string]interface{}{
+						"prometheus": map[string]any{
+							"config": map[string]any{
+								"scrape_configs": []any{
+									map[string]any{
+										"job": "somejob",
+										"metric_relabel_configs": []map[string]any{
+											{
+												"action":      "labelmap",
+												"regex":       "label_(.+)",
+												"replacement": "$$1",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []v1beta1.AnyConfig{
+				{Object: map[string]interface{}{
+					"job": "somejob",
+					"metric_relabel_configs": []any{
+						map[any]any{
+							"action":      "labelmap",
+							"regex":       "label_(.+)",
+							"replacement": "$1",
+						},
+					},
+				}},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			configStr, err := testCase.input.Yaml()
+			require.NoError(t, err)
+			actual, err := getScrapeConfigs(configStr)
+			assert.Equal(t, testCase.wantErr, err)
+			assert.Equal(t, testCase.want, actual)
+		})
+	}
 }

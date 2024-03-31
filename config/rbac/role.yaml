@@ -199,6 +199,8 @@ rules:
   resources:
   - targetallocators
   verbs:
+  - create
+  - delete
   - get
   - list
   - patch

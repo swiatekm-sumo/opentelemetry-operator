@@ -28,9 +28,7 @@ spec:
         app.kubernetes.io/version: latest
     spec:
       containers:
-        - args:
-            - --enable-prometheus-cr-watcher
-          env:
+        - env:
             - name: OTELCOL_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -80,11 +78,9 @@ apiVersion: v1
 data:
   targetallocator.yaml: |
     allocation_strategy: consistent-hashing
-    collector_selector:
-      matchlabels: {}
-      matchexpressions: []
     filter_strategy: relabel-config
     prometheus_cr:
+      enabled: true
       pod_monitor_selector: null
       scrape_interval: 30s
       service_monitor_selector: null
